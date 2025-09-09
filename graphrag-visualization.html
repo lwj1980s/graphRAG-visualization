@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CLL/SLL 知识图谱可视化</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+    <style>
+        body {
+            font-family: 'Microsoft YaHei', Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+        
+        h1 {
+            text-align: center;
+            color: #2d3748;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .controls {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        
+        label {
+            font-size: 0.9em;
+            color: #4a5568;
+            font-weight: 600;
+        }
+        
+        select, button {
+            padding: 10px 15px;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            background: white;
+            color: #2d3748;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        select:hover, button:hover {
+            border-color: #667eea;
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2);
+            transform: translateY(-2px);
+        }
+        
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            font-weight: 600;
+            border: none;
+        }
+        
+        #graph {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+            position: relative;
+        }
+        
+        .links line {
+            stroke-opacity: 0.8;
+            transition: all 0.3s ease;
+        }
+        
+        .links line:hover {
+            stroke-opacity: 1;
+            stroke-width: 3;
+        }
+        
+        .nodes circle {
+            stroke: #fff;
+            stroke-width: 2px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .nodes circle:hover {
+            stroke-width: 3px;
+            filter: brightness(1.2);
+        }
+        
+        .node-text {
+            font-size: 12px;
+            pointer-events: none;
+            text-shadow: 0 1px 0 #fff, 1px 0 0 #fff, 0 -1px 0 #fff, -1px 0 0 #fff;
+            font-weight: 500;
+        }
+        
+        .link-text {
+            font-size: 10px;
+            fill: #718096;
+            pointer-events: none;
+            text-shadow: 0 1px 0 #fff, 1px 0 0 #fff, 0 -1px 0 #fff, -1px 0 0 #fff;
+        }
+        
+        .tooltip {
+            position: absolute;
+            text-align: left;
+            padding: 12px;
+            font-size: 13px;
+            background: rgba(0, 0, 0, 0.9);
+            color: white;
+            border-radius: 8px;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s;
+            max-width: 300px;
+            line-height: 1.5;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+        
+        .stats {
+            display: flex;
+            gap: 30px;
+            margin-top: 20px;
+            padding: 20px;
+            background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%);
+            border-radius: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        
+        .stat-item {
+            text-align: center;
+            padding: 15px 25px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+        
+        .stat-value {
+            font-size: 2em;
+            font-weight: bold;
+            color: #667eea;
+            margin-bottom: 5px;
+        }
+        
+        .stat-label {
+            font-size: 0.9em;
+            color: #718096;
+        }
+        
+        .legend {
+            display: flex;
+            gap: 20px;
+            margin-top: 20px;
+            padding: 15px;
+            background: #f7fafc;
+            border-radius: 10px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            border: 2px solid white;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧬 CLL/SLL 医学知识图谱</h1>
+        
+        <div class="controls">
+            <div class="control-group">
+                <label>数据源选择</label>
+                <select id="chunkSelect">
+                    <option value="all">所有数据块</option>
+                    <option value="chunk1">数据块 1</option>
+                    <option value="chunk2">数据块 2</option>
+                </select>
+            </div>
+            <div class="control-group">
+                <label>布局算法</label>
+                <select id="layoutSelect">
+                    <option value="force">力导向布局</option>
+                    <option value="radial">径向布局</option>
+                    <option value="hierarchical">层次布局</option>
+                </select>
+            </div>
+            <button onclick="resetZoom()">重置视图</button>
+            <button onclick="exportData()">导出数据</button>
+        </div>
+        
+        <div id="graph"></div>
+        
+        <div class="stats">
+            <div class="stat-item">
+                <div class="stat-value" id="nodeCount">0</div>
+                <div class="stat-label">实体节点</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value" id="edgeCount">0</div>
+                <div class="stat-label">关系边</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value" id="clusterCount">0</div>
+                <div class="stat-label">聚类数</div>
+            </div>
+        </div>
+        
+        <div class="legend">
+            <div class="legend-item">
+                <div class="legend-color" style="background: #FF6B6B;"></div>
+                <span>疾病</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: #4ECDC4;"></div>
+                <span>组织机构</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: #45B7D1;"></div>
+                <span>地区</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: #FFA07A;"></div>
+                <span>药物/治疗</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: #98D8C8;"></div>
+                <span>其他</span>
+            </div>
+        </div>
+        
+        <div class="tooltip"></div>
+    </div>
+
+    <script>
+        // GraphRAG数据
+        const graphData = {
+            chunk1: {
+                entities: ["慢性淋巴细胞白血病", "CLL", "小淋巴细胞淋巴瘤", "SLL", "世界卫生组织", 
+                          "WHO", "美国", "中国", "非霍奇金淋巴瘤", "NHL", "B 细胞恶性肿瘤"],
+                triples: [
+                    ["慢性淋巴细胞白血病", "缩写", "CLL"],
+                    ["小淋巴细胞淋巴瘤", "缩写", "SLL"],
+                    ["世界卫生组织", "缩写", "WHO"],
+                    ["慢性淋巴细胞白血病", "属于", "B 细胞恶性肿瘤"],
+                    ["小淋巴细胞淋巴瘤", "属于", "B 细胞恶性肿瘤"],
+                    ["慢性淋巴细胞白血病", "与...被WHO分类为同种疾病", "小淋巴细胞淋巴瘤"],
+                    ["美国", "CLL/SLL年发病率", "XX.XX/XX,XX"],
+                    ["CLL/SLL", "在美国占白血病新发病例比例", "XX/XX"],
+                    ["中国", "CLL/SLL发病率", "相对较低"],
+                    ["CLL/SLL", "在中国占非霍奇金淋巴瘤比例", "XX%～XX%"],
+                    ["非霍奇金淋巴瘤", "在中国发病率", "XX.XX/XX,XX"]
+                ]
+            },
+            chunk2: {
+                entities: ["中国", "白血病", "CLL/SLL", "非霍奇金淋巴瘤", "NHL", "NCCN", 
+                          "CACA", "ACS", "NCI", "世界卫生组织", "WHO", "Bruton 酪氨酸激酶", "BTK"],
+                triples: [
+                    ["CLL/SLL", "属于", "白血病"],
+                    ["CLL/SLL", "占", "非霍奇金淋巴瘤（NHL）"],
+                    ["非霍奇金淋巴瘤", "简称", "NHL"],
+                    ["中国", "CLL/SLL发病率", "相对较低"],
+                    ["中国", "NHL发病率", "XX.XX/XX,XX"],
+                    ["中国", "新发CLL/SLL患者比率", "XX.XX/XX,XX"],
+                    ["CLL/SLL", "常见于", "老年人群体"],
+                    ["CLL/SLL", "男性发病率", "更高"],
+                    ["世界卫生组织", "简称", "WHO"],
+                    ["CLL/SLL", "治疗选择取决于", "临床因素"],
+                    ["CLL/SLL", "治疗选择取决于", "生物学标志物"],
+                    ["CLL/SLL", "治疗选择取决于", "既往治疗类型"],
+                    ["Bruton 酪氨酸激酶", "简称", "BTK"],
+                    ["BTK抑制剂", "是", "CLL/SLL一线治疗首选"]
+                ]
+            }
+        };
+
+        // 实体类型分类函数
+        function getNodeType(entity) {
+            const diseases = ["慢性淋巴细胞白血病", "CLL", "小淋巴细胞淋巴瘤", "SLL", 
+                            "非霍奇金淋巴瘤", "NHL", "白血病", "CLL/SLL", "B 细胞恶性肿瘤"];
+            const orgs = ["世界卫生组织", "WHO", "NCCN", "CACA", "ACS", "NCI"];
+            const locations = ["美国", "中国"];
+            const treatments = ["Bruton 酪氨酸激酶", "BTK", "BTK抑制剂"];
+            
+            if (diseases.includes(entity)) return "disease";
+            if (orgs.includes(entity)) return "organization";
+            if (locations.includes(entity)) return "location";
+            if (treatments.includes(entity)) return "treatment";
+            return "other";
+        }
+
+        // 颜色映射
+        const colorMap = {
+            disease: "#FF6B6B",
+            organization: "#4ECDC4",
+            location: "#45B7D1",
+            treatment: "#FFA07A",
+            other: "#98D8C8"
+        };
+
+        // 处理数据函数
+        function processData(selectedChunk) {
+            const nodes = new Map();
+            const links = [];
+            
+            let dataToProcess = [];
+            if (selectedChunk === 'all') {
+                dataToProcess = [...graphData.chunk1.triples, ...graphData.chunk2.triples];
+            } else if (selectedChunk === 'chunk1') {
+                dataToProcess = graphData.chunk1.triples;
+            } else {
+                dataToProcess = graphData.chunk2.triples;
+            }
+            
+            // 创建节点和边
+            dataToProcess.forEach(triple => {
+                const [source, relation, target] = triple;
+                
+                if (!nodes.has(source)) {
+                    nodes.set(source, {
+                        id: source,
+                        type: getNodeType(source),
+                        connections: 0
+                    });
+                }
+                
+                if (!nodes.has(target)) {
+                    nodes.set(target, {
+                        id: target,
+                        type: getNodeType(target),
+                        connections: 0
+                    });
+                }
+                
+                nodes.get(source).connections++;
+                nodes.get(target).connections++;
+                
+                links.push({
+                    source: source,
+                    target: target,
+                    relation: relation
+                });
+            });
+            
+            return {
+                nodes: Array.from(nodes.values()),
+                links: links
+            };
+        }
+
+        // 创建图形
+        function createGraph(data) {
+            // 清除之前的图
+            d3.select("#graph").selectAll("*").remove();
+            
+            const width = 1340;
+            const height = 600;
+            
+            const svg = d3.select("#graph")
+                .append("svg")
+                .attr("width", width)
+                .attr("height", height);
+            
+            const g = svg.append("g");
+            
+            // 添加缩放功能
+            const zoom = d3.zoom()
+                .scaleExtent([0.1, 10])
+                .on("zoom", (event) => {
+                    g.attr("transform", event.transform);
+                });
+            
+            svg.call(zoom);
+            
+            // 创建力导向模拟
+            const simulation = d3.forceSimulation(data.nodes)
+                .force("link", d3.forceLink(data.links)
+                    .id(d => d.id)
+                    .distance(100))
+                .force("charge", d3.forceManyBody().strength(-300))
+                .force("center", d3.forceCenter(width / 2, height / 2))
+                .force("collision", d3.forceCollide().radius(30));
+            
+            // 创建箭头标记
+            svg.append("defs").selectAll("marker")
+                .data(["end"])
+                .enter().append("marker")
+                .attr("id", "arrow")
+                .attr("viewBox", "0 -5 10 10")
+                .attr("refX", 25)
+                .attr("refY", 0)
+                .attr("markerWidth", 6)
+                .attr("markerHeight", 6)
+                .attr("orient", "auto")
+                .append("path")
+                .attr("d", "M0,-5L10,0L0,5")
+                .attr("fill", "#999");
+            
+            // 添加边
+            const link = g.append("g")
+                .attr("class", "links")
+                .selectAll("line")
+                .data(data.links)
+                .enter().append("line")
+                .attr("stroke", "#999")
+                .attr("stroke-width", 2)
+                .attr("marker-end", "url(#arrow)");
+            
+            // 添加边的标签
+            const linkText = g.append("g")
+                .attr("class", "link-texts")
+                .selectAll("text")
+                .data(data.links)
+                .enter().append("text")
+                .attr("class", "link-text")
+                .text(d => d.relation);
+            
+            // 添加节点
+            const node = g.append("g")
+                .attr("class", "nodes")
+                .selectAll("circle")
+                .data(data.nodes)
+                .enter().append("circle")
+                .attr("r", d => Math.min(10 + d.connections * 2, 25))
+                .attr("fill", d => colorMap[d.type])
+                .call(d3.drag()
+                    .on("start", dragstarted)
+                    .on("drag", dragged)
+                    .on("end", dragended));
+            
+            // 添加节点标签
+            const nodeText = g.append("g")
+                .attr("class", "node-texts")
+                .selectAll("text")
+                .data(data.nodes)
+                .enter().append("text")
+                .attr("class", "node-text")
+                .attr("text-anchor", "middle")
+                .attr("dy", ".35em")
+                .text(d => d.id);
+            
+            // 工具提示
+            const tooltip = d3.select(".tooltip");
+            
+            node.on("mouseover", function(event, d) {
+                tooltip.transition()
+                    .duration(200)
+                    .style("opacity", .9);
+                tooltip.html(`<strong>${d.id}</strong><br/>
+                            类型: ${d.type}<br/>
+                            连接数: ${d.connections}`)
+                    .style("left", (event.pageX + 10) + "px")
+                    .style("top", (event.pageY - 28) + "px");
+            })
+            .on("mouseout", function(d) {
+                tooltip.transition()
+                    .duration(500)
+                    .style("opacity", 0);
+            });
+            
+            // 更新位置
+            simulation.on("tick", () => {
+                link
+                    .attr("x1", d => d.source.x)
+                    .attr("y1", d => d.source.y)
+                    .attr("x2", d => d.target.x)
+                    .attr("y2", d => d.target.y);
+                
+                linkText
+                    .attr("x", d => (d.source.x + d.target.x) / 2)
+                    .attr("y", d => (d.source.y + d.target.y) / 2);
+                
+                node
+                    .attr("cx", d => d.x)
+                    .attr("cy", d => d.y);
+                
+                nodeText
+                    .attr("x", d => d.x)
+                    .attr("y", d => d.y);
+            });
+            
+            // 拖拽函数
+            function dragstarted(event, d) {
+                if (!event.active) simulation.alphaTarget(0.3).restart();
+                d.fx = d.x;
+                d.fy = d.y;
+            }
+            
+            function dragged(event, d) {
+                d.fx = event.x;
+                d.fy = event.y;
+            }
+            
+            function dragended(event, d) {
+                if (!event.active) simulation.alphaTarget(0);
+                d.fx = null;
+                d.fy = null;
+            }
+            
+            // 更新统计信息
+            document.getElementById('nodeCount').textContent = data.nodes.length;
+            document.getElementById('edgeCount').textContent = data.links.length;
+            
+            // 计算聚类数（简单的连通分量计算）
+            const clusters = new Set();
+            data.nodes.forEach(node => {
+                if (node.type) clusters.add(node.type);
+            });
+            document.getElementById('clusterCount').textContent = clusters.size;
+            
+            // 保存zoom对象供重置使用
+            window.currentZoom = zoom;
+            window.currentSvg = svg;
+        }
+
+        // 重置缩放
+        function resetZoom() {
+            if (window.currentSvg && window.currentZoom) {
+                window.currentSvg.transition()
+                    .duration(750)
+                    .call(window.currentZoom.transform, d3.zoomIdentity);
+            }
+        }
+
+        // 导出数据
+        function exportData() {
+            const selectedChunk = document.getElementById('chunkSelect').value;
+            const data = processData(selectedChunk);
+            const exportObj = {
+                nodes: data.nodes,
+                links: data.links,
+                timestamp: new Date().toISOString()
+            };
+            
+            const dataStr = JSON.stringify(exportObj, null, 2);
+            const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+            
+            const exportFileDefaultName = `graphrag_data_${Date.now()}.json`;
+            
+            const linkElement = document.createElement('a');
+            linkElement.setAttribute('href', dataUri);
+            linkElement.setAttribute('download', exportFileDefaultName);
+            linkElement.click();
+        }
+
+        // 布局切换
+        document.getElementById('layoutSelect').addEventListener('change', function(e) {
+            const selectedChunk = document.getElementById('chunkSelect').value;
+            const data = processData(selectedChunk);
+            
+            if (e.target.value === 'radial') {
+                // 径向布局逻辑
+                const centerNode = data.nodes.reduce((max, node) => 
+                    node.connections > max.connections ? node : max
+                );
+                // 实现径向布局...
+            } else if (e.target.value === 'hierarchical') {
+                // 层次布局逻辑
+                // 实现层次布局...
+            }
+            
+            createGraph(data);
+        });
+
+        // 数据源切换
+        document.getElementById('chunkSelect').addEventListener('change', function(e) {
+            const data = processData(e.target.value);
+            createGraph(data);
+        });
+
+        // 初始化
+        const initialData = processData('all');
+        createGraph(initialData);
+    </script>
+</body>
+</html>
