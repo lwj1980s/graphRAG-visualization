@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CLL/SLL 知识图谱可视化</title>
+    <title>知识图谱可视化</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
     <style>
         body {
@@ -194,15 +194,17 @@
 </head>
 <body>
     <div class="container">
-        <h1>知识图谱</h1>
+        <h1>🧬 知识图谱</h1>
         
         <div class="controls">
             <div class="control-group">
                 <label>数据源选择</label>
                 <select id="chunkSelect">
                     <option value="all">所有数据块</option>
+                    <!--
                     <option value="chunk1">数据块 1</option>
                     <option value="chunk2">数据块 2</option>
+                     -->
                 </select>
             </div>
             <div class="control-group">
@@ -263,43 +265,21 @@
     <script>
         // GraphRAG数据
         const graphData = {
-            chunk1: {
-                entities: ["慢性淋巴细胞白血病", "CLL", "小淋巴细胞淋巴瘤", "SLL", "世界卫生组织", 
-                          "WHO", "美国", "中国", "非霍奇金淋巴瘤", "NHL", "B 细胞恶性肿瘤"],
-                triples: [
-                    ["慢性淋巴细胞白血病", "缩写", "CLL"],
-                    ["小淋巴细胞淋巴瘤", "缩写", "SLL"],
-                    ["世界卫生组织", "缩写", "WHO"],
-                    ["慢性淋巴细胞白血病", "属于", "B 细胞恶性肿瘤"],
-                    ["小淋巴细胞淋巴瘤", "属于", "B 细胞恶性肿瘤"],
-                    ["慢性淋巴细胞白血病", "与...被WHO分类为同种疾病", "小淋巴细胞淋巴瘤"],
-                    ["美国", "CLL/SLL年发病率", "XX.XX/XX,XX"],
-                    ["CLL/SLL", "在美国占白血病新发病例比例", "XX/XX"],
-                    ["中国", "CLL/SLL发病率", "相对较低"],
-                    ["CLL/SLL", "在中国占非霍奇金淋巴瘤比例", "XX%～XX%"],
-                    ["非霍奇金淋巴瘤", "在中国发病率", "XX.XX/XX,XX"]
-                ]
-            },
-            chunk2: {
-                entities: ["中国", "白血病", "CLL/SLL", "非霍奇金淋巴瘤", "NHL", "NCCN", 
-                          "CACA", "ACS", "NCI", "世界卫生组织", "WHO", "Bruton 酪氨酸激酶", "BTK"],
-                triples: [
-                    ["CLL/SLL", "属于", "白血病"],
-                    ["CLL/SLL", "占", "非霍奇金淋巴瘤（NHL）"],
-                    ["非霍奇金淋巴瘤", "简称", "NHL"],
-                    ["中国", "CLL/SLL发病率", "相对较低"],
-                    ["中国", "NHL发病率", "XX.XX/XX,XX"],
-                    ["中国", "新发CLL/SLL患者比率", "XX.XX/XX,XX"],
-                    ["CLL/SLL", "常见于", "老年人群体"],
-                    ["CLL/SLL", "男性发病率", "更高"],
-                    ["世界卫生组织", "简称", "WHO"],
-                    ["CLL/SLL", "治疗选择取决于", "临床因素"],
-                    ["CLL/SLL", "治疗选择取决于", "生物学标志物"],
-                    ["CLL/SLL", "治疗选择取决于", "既往治疗类型"],
-                    ["Bruton 酪氨酸激酶", "简称", "BTK"],
-                    ["BTK抑制剂", "是", "CLL/SLL一线治疗首选"]
-                ]
-            }
+            entities: ["慢性淋巴细胞白血病", "CLL", "小淋巴细胞淋巴瘤", "SLL", "世界卫生组织", 
+                        "WHO", "美国", "中国", "非霍奇金淋巴瘤", "NHL", "B 细胞恶性肿瘤"],
+            triples: [
+                ["慢性淋巴细胞白血病", "缩写", "CLL"],
+                ["小淋巴细胞淋巴瘤", "缩写", "SLL"],
+                ["世界卫生组织", "缩写", "WHO"],
+                ["慢性淋巴细胞白血病", "属于", "B 细胞恶性肿瘤"],
+                ["小淋巴细胞淋巴瘤", "属于", "B 细胞恶性肿瘤"],
+                ["慢性淋巴细胞白血病", "与...被WHO分类为同种疾病", "小淋巴细胞淋巴瘤"],
+                ["美国", "CLL/SLL年发病率", "XX.XX/XX,XX"],
+                ["CLL/SLL", "在美国占白血病新发病例比例", "XX/XX"],
+                ["中国", "CLL/SLL发病率", "相对较低"],
+                ["CLL/SLL", "在中国占非霍奇金淋巴瘤比例", "XX%～XX%"],
+                ["非霍奇金淋巴瘤", "在中国发病率", "XX.XX/XX,XX"]
+            ]
         };
 
         // 实体类型分类函数
@@ -333,13 +313,8 @@
             
             let dataToProcess = [];
             if (selectedChunk === 'all') {
-                dataToProcess = [...graphData.chunk1.triples, ...graphData.chunk2.triples];
-            } else if (selectedChunk === 'chunk1') {
-                dataToProcess = graphData.chunk1.triples;
-            } else {
-                dataToProcess = graphData.chunk2.triples;
+                dataToProcess = graphData.triples;
             }
-            
             // 创建节点和边
             dataToProcess.forEach(triple => {
                 const [source, relation, target] = triple;
@@ -552,7 +527,7 @@
 
         // 导出数据
         function exportData() {
-            const selectedChunk = document.getElementById('chunkSelect').value;
+            const selectedChunk = 'all';
             const data = processData(selectedChunk);
             const exportObj = {
                 nodes: data.nodes,
